@@ -168,7 +168,7 @@ void communicate(){
                         close(clientfd[clientfd_array_iter]);
                         clientfd[clientfd_array_iter] = -1;
                         /* Connection reset by client */
-                    } 
+                    }
                 }else if(nread == 0){
                     syslog(LOG_NOTICE,"Connect close by client");
                     FD_CLR(clientfd[clientfd_array_iter],&readfds);

@@ -11,7 +11,7 @@
 #define SERV_IPV4_BUF_LENGTH 20
 
 /* define server recieve buffer length */
-#define SERV_RECV_BUF_LEN 2048
+#define SERV_RECV_BUF_LEN 65535
 
 /* define server reuseaddr option */
 #define SERV_REUSEADDR_OPTION 1
