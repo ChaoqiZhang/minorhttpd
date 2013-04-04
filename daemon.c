@@ -64,6 +64,10 @@ void make_process_daemon(){
             exit(-1);
         }
     }
+    
+    setgroups(0,NULL);
+    setgid(1000);
+    setuid(1000);
 
     if((pid = fork()) < 0){
         snprintf(errmessage,ERR_BUFSIZE,"Error , call fork error : %s",strerror(errno));

@@ -19,8 +19,7 @@
 #endif
 
 
-void solve_get(int,char *);
-extern void response(int,int,char *);
+extern void response(int,char *);
 
 int solve_http_request_method(char *http_request_method){
     
@@ -36,20 +35,9 @@ void solve_http_request(int requestfd,int flag_method,char *http_request_path){
     
     switch(flag_method){
         case FLAG_GET:
-            solve_get(requestfd,http_request_path);
+            response(requestfd,http_request_path);
             break;
     }
     return ;
-}
-
-void solve_get(int requestfd,char *http_request_path){
-    
-    struct stat reqstat;
-    if(lstat(http_request_path,&reqstat) != 0){
-        if(errno == ENOENT){
-            response(requestfd,404,NULL);
-        }
-    }
-
 }
 

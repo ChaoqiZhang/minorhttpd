@@ -20,8 +20,8 @@
     #include "request.h"
 #endif
 
-extern const char *ROOT_PATH;
 
+extern const char *ROOT_PATH;
 
 struct thread_arg{
     int requestfd;

@@ -11,6 +11,7 @@
 #include<string.h>
 #include<errno.h>
 #include<sys/select.h>
+#include<pthread.h>
 
 #ifndef MINORHTTPD_SERV_DAEMON_H
     #define MINORHTTPD_SERV_DAEMON_H
@@ -30,7 +31,9 @@ int cur_clientfd_ready;
 fd_set readfds;
 
 void init_clientfd_array();
+void init_mutex_array();
 extern void deal_http_request(int,char *,int);
+extern pthread_mutex_t sockfd_mutex_arr[SERV_MAX_DESCRIPTOR];
 
 void communicate(){
     
@@ -56,6 +59,10 @@ void communicate(){
         exit(-1);
     }
     
+    syslog(LOG_NOTICE,"getuid : %d",getuid());
+    syslog(LOG_NOTICE,"geteuid : %d",geteuid());
+    syslog(LOG_NOTICE,"getgid : %d",getgid());
+    syslog(LOG_NOTICE,"getegid : %d",getegid());
 
     bzero(&server,sizeof(server));
 
@@ -90,10 +97,11 @@ void communicate(){
     }
     
     init_clientfd_array();
-    
+    init_mutex_array();
+
     FD_SET(listenfd,&readfds);
     max_clientfd = (max_clientfd > listenfd) ? max_clientfd : listenfd;
-
+    
     while(1){
 
         tmpreadfds = readfds;
@@ -205,3 +213,12 @@ void init_clientfd_array(){
     return ;
 }
 
+void init_mutex_array(){
+    
+    int itermutex;
+    for(itermutex = 0 ; itermutex < SERV_MAX_DESCRIPTOR ; itermutex ++){
+        pthread_mutex_init(&sockfd_mutex_arr[itermutex],NULL);
+    }
+    return ;
+
+}
