@@ -94,7 +94,8 @@ void list_directory_content(int reqhandfd,char *http_request_path){
     struct dirent **dirp;
     int nfile;
     int nfileiter;
-
+    int tmplen;
+    
     memset(list,0,sizeof(list));
 
     strncpy(message,HEADER200,HTTP_MESSAGE_LENGTH);
@@ -117,7 +118,13 @@ void list_directory_content(int reqhandfd,char *http_request_path){
     nfile = scandir(http_request_path,&dirp,0,alphasort);
     while(nfileiter < nfile){
         strncpy(tmppath,http_request_path,PATH_MAX);
+        tmplen = strlen(tmppath);
+        if(tmppath[tmplen-1] != '/'){
+            tmppath[tmplen] = '/';
+            tmppath[tmplen+1] = '\0';
+        }
         strncat(tmppath,dirp[nfileiter]->d_name,PATH_MAX-strlen(tmppath)-1);
+        syslog(LOG_NOTICE,"%s",tmppath);
         if(lstat(tmppath,&buf) == -1){
             continue;   
         }else{
@@ -129,6 +136,11 @@ void list_directory_content(int reqhandfd,char *http_request_path){
             
             strncat(list,"<a href=\"",HTTP_MESSAGE_LENGTH-strlen(list)-1);
             strncat(list,ptr,HTTP_MESSAGE_LENGTH-strlen(list)-1);
+            tmplen = strlen(list);
+            if(list[tmplen-1]!='/'){
+                list[tmplen] = '/';
+                list[tmplen+1] = '\0';
+            }
             strncat(list,dirp[nfileiter]->d_name,HTTP_MESSAGE_LENGTH-strlen(list)-1);
             strncat(list,"\">",HTTP_MESSAGE_LENGTH-strlen(list)-1);
             strncat(list,dirp[nfileiter]->d_name,HTTP_MESSAGE_LENGTH-strlen(list)-1);
