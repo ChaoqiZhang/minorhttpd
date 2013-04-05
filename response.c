@@ -14,6 +14,7 @@
 #include<errno.h>
 #include<pthread.h>
 #include<dirent.h>
+#include<time.h>
 
 #ifndef MINORHTTPD_SERV_REQUEST_H
     #define MINORHTTPD_SERV_REQUEST_H
@@ -32,12 +33,15 @@
 
 void response4xx(int,int);
 void list_directory_content(int,char *);
+void responsereg(int,char *);
+void get_request_file_ext(char *,char*);
 
 extern pthread_mutex_t sockfd_mutex_arr[SERV_MAX_DESCRIPTOR];
 extern int  writen(int,char *,int);
 
 void response(int reqhandfd,char *http_request_path){
     
+
     DIR *dirp;
     struct stat reqstat;
     
@@ -51,7 +55,7 @@ void response(int reqhandfd,char *http_request_path){
         }
     }else{
         if(S_ISREG(reqstat.st_mode)){
-            //solve reg file
+            responsereg(reqhandfd,http_request_path);               
         }else if(S_ISDIR(reqstat.st_mode)){
             if((dirp = opendir(http_request_path)) == NULL){
                 if(errno == EACCES){
@@ -124,7 +128,6 @@ void list_directory_content(int reqhandfd,char *http_request_path){
             tmppath[tmplen+1] = '\0';
         }
         strncat(tmppath,dirp[nfileiter]->d_name,PATH_MAX-strlen(tmppath)-1);
-        syslog(LOG_NOTICE,"%s",tmppath);
         if(lstat(tmppath,&buf) == -1){
             continue;   
         }else{
@@ -155,8 +158,8 @@ void list_directory_content(int reqhandfd,char *http_request_path){
     sprintf(conlen,"Content-Length: %d\r\n\r\n",(int)strlen(content));
     strncat(message,conlen,HTTP_MESSAGE_LENGTH-strlen(conlen)-1);
 
-    writen(reqhandfd,message,strlen(message)+1);
-    writen(reqhandfd,content,strlen(content)+1);
+    writen(reqhandfd,message,strlen(message));
+    writen(reqhandfd,content,strlen(content));
 }
 
 void response4xx(int reqhandfd,int flag){
@@ -184,14 +187,12 @@ void response4xx(int reqhandfd,int flag){
             strncat(message,CONTYPEHTML,HTTP_MESSAGE_LENGTH-strlen(message)-1);
             strncpy(path4xx,DIR_PATH,PATH_MAX);
             strncat(path4xx,PAGE404,PATH_MAX-strlen(path4xx)-1);
-            syslog(LOG_NOTICE,"%s",path4xx);
             break;
         case RES403:
             strncpy(message,HEADER403,HTTP_MESSAGE_LENGTH);
             strncat(message,CONTYPEHTML,HTTP_MESSAGE_LENGTH-strlen(message)-1);
             strncpy(path4xx,DIR_PATH,PATH_MAX);
             strncat(path4xx,PAGE403,PATH_MAX-strlen(path4xx)-1);
-            syslog(LOG_NOTICE,"%s",path4xx);
             break;
     }
     
@@ -201,11 +202,152 @@ void response4xx(int reqhandfd,int flag){
     syslog(LOG_NOTICE,"%d",filelength);
     sprintf(conlen,"Content-Length: %d\r\n\r\n",filelength);
     strncat(message,conlen,HTTP_MESSAGE_LENGTH-strlen(message)-1);
-    writen(reqhandfd,message,strlen(message)+1);
+    writen(reqhandfd,message,strlen(message));
     fd = open(path4xx,O_RDONLY);
     while((nread = read(fd,file,HTTP_MESSAGE_LENGTH))){
+        if(nread < 0){
+            if(errno == EINTR)
+                continue;
+            else{
+                syslog(LOG_ERR,"%s",strerror(errno));
+                break;
+            }
+        }
         writen(reqhandfd,file,nread);
     }
     close(fd);
     
+}
+
+void responsereg(int reqhandfd,char *http_request_path){
+    
+    FILE *fp;
+    int typeflag;
+
+    int fd;
+    int nread;
+    char *ptr;
+    struct stat buf;
+    char ext[PATH_MAX];
+    char message[HTTP_MESSAGE_LENGTH];
+    char conlen[HTTP_MESSAGE_LENGTH];
+    char content[HTTP_MESSAGE_LENGTH];
+
+    extern char *ROOT_PATH;
+    extern char *HEADER200;
+    extern char *CONTYPEHTML;
+    extern char *CONTYPEPLAIN;
+    extern char *CONTYPECSS;
+    extern char *CONTYPEGIF;
+    extern char *CONTYPEPNG;
+    extern char *CONTYPEJPEG;
+    extern char *CONTYPEJS; 
+    extern char *SERVER;
+    extern char *ACCRANGES;
+    
+    time_t timep;
+    int templen;
+
+
+    ptr = http_request_path + strlen(ROOT_PATH);
+    get_request_file_ext(ptr,ext);
+    syslog(LOG_NOTICE,"%s",ext);
+    syslog(LOG_NOTICE,"%s",http_request_path);
+
+    if(lstat(http_request_path,&buf) == -1){
+        if(errno == EACCES){
+            response4xx(reqhandfd,403);
+        }else{
+            response4xx(reqhandfd,404);
+        }
+    }else{
+    
+        sprintf(conlen,"Content-Length: %d\r\n",(int)(buf.st_size));
+        typeflag = 0;
+
+        if((fp = fopen(http_request_path,"r")) == NULL){
+            if(errno == EACCES){
+                response4xx(reqhandfd,403);
+            }else{
+                response4xx(reqhandfd,404);
+            }
+        }else{
+            strncpy(message,HEADER200,HTTP_MESSAGE_LENGTH);
+            if(strcmp(ext,"html") == 0 || strcmp(ext,"htm") == 0){
+                strncat(message,CONTYPEHTML,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"text") == 0 || strcmp(ext,"c") == 0 || strcmp(ext,"c++")==0 \
+                    || strcmp(ext,"pl")==0 || strcmp(ext,"cc") == 0 || strcmp(ext,"h") == 0){
+                strncat(message,CONTYPEPLAIN,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"css") == 0){
+                strncat(message,CONTYPECSS,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"gif") == 0){
+                typeflag = 1;
+                strncat(message,CONTYPEGIF,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"png") == 0){
+                typeflag = 1;
+                strncat(message,CONTYPEPNG,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"jpeg") == 0 || strcmp(ext,"jpg") == 0 || strcmp(ext,"jpe") == 0){
+                typeflag = 1;
+                strncat(message,CONTYPEJPEG,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }
+        }
+
+        strncat(message,conlen,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+        strncat(message,SERVER,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+        strncat(message,ACCRANGES,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+        time(&timep);
+        sprintf(conlen,"Date: %s",asctime(gmtime(&timep)));
+        strncat(message,conlen,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+        
+        int templen = strlen(message);
+        message[templen-1]='\0';
+
+        strncat(message,"\r\n\r\n",HTTP_MESSAGE_LENGTH-strlen(message)-1);
+    
+        syslog(LOG_NOTICE,"%s",message);
+        writen(reqhandfd,message,strlen(message));
+        
+        if(typeflag == 1){
+            fclose(fp);
+            if((fp = fopen(http_request_path,"rb")) == NULL){
+                if(errno == EACCES){
+                    response4xx(reqhandfd,403);
+                }else{
+                    response4xx(reqhandfd,404);
+                }
+            }
+        }
+        
+        while((nread = fread(content,sizeof(char),HTTP_MESSAGE_LENGTH,fp)) ){
+            if(nread < 0){
+                if(errno == EINTR){
+                    syslog(LOG_ERR,"%s",strerror(errno));
+                    continue;
+                }
+                else{
+                    syslog(LOG_ERR,"%s",strerror(errno));
+                    break;
+                }
+
+            }else{
+                writen(reqhandfd,content,nread);
+            }
+        }
+        fclose(fp);
+    }
+    return ;
+}
+
+void get_request_file_ext(char *ptr,char *ext){
+    
+    int tmplen = strlen(ptr);
+    char *p ;
+
+    for(p=ptr+tmplen;p>=ptr;p--){
+        if(*p == '.'){
+            strncpy(ext,p+1,PATH_MAX);
+        }
+    }
+    
+    return ;
 }

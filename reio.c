@@ -24,5 +24,5 @@ int writen(int fd,char *message,int messagesize){
         ptr += nwrite;
     }
 
-    return messagesize;
+    return messagesize-nleft;
 }
