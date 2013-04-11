@@ -1,6 +1,9 @@
 
-minorhttpd: main.o daemon.o communicate.o request.o solve.o response.o global.o conf.o reio.o
-	cc -o minorhttpd main.o daemon.o communicate.o request.o solve.o response.o global.o conf.o reio.o -lpthread
+minorhttpd: main.o daemon.o communicate.o request.o solve.o response.o global.o conf.o reio.o php_cgi.o
+	cc -o minorhttpd main.o daemon.o communicate.o request.o solve.o response.o global.o conf.o reio.o php_cgi.o -lpthread
+
+php_cgi.o: cgi/php_cgi.c request.h
+	cc -c cgi/php_cgi.c
 
 global.o: global.c -lpthread
 	cc -c global.c

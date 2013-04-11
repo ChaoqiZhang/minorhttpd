@@ -31,7 +31,7 @@ struct thread_arg{
 void wait_child_thread(int);
 void *get_request_obj(void *);
 extern int solve_http_request_method(char *);
-extern void solve_http_request(int,int,char *);
+extern void solve_http_request(int,int,char *,char *);
 
 void deal_http_request(int request_fd,char *message,int messagelen){
     
@@ -43,13 +43,13 @@ void deal_http_request(int request_fd,char *message,int messagelen){
 
     openlog(DAEMON_LOG_IDENT,LOG_CONS,LOG_DAEMON);
     
-    syslog(LOG_NOTICE,"%s",message);
 
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
     
     reqinfo.requestfd = request_fd;
     strncpy(reqinfo.requestmessage,message,HTTP_MESSAGE_LENGTH);
+    
 
     pthread_create(&thread,&attr,(void *)get_request_obj,(void *)&reqinfo);
     pause();
@@ -64,6 +64,7 @@ void *get_request_obj(void *arg){
     char search[] = " \r\n";
     char param[] = "?=&";
     char request_path[HTTP_URL_LENGTH];
+    char tmpmessage[HTTP_MESSAGE_LENGTH];
 
     struct stat request_buf;
     struct thread_arg reqinfo;
@@ -77,9 +78,10 @@ void *get_request_obj(void *arg){
     reqinfo.requestfd = (*(struct thread_arg *)arg).requestfd;
     strncpy(reqinfo.requestmessage,(*(struct thread_arg*)arg).requestmessage,\
             HTTP_MESSAGE_LENGTH);
-    
+    strncpy(tmpmessage,(*(struct thread_arg*)arg).requestmessage,HTTP_MESSAGE_LENGTH);
     kill(getpid(),SIGUSR1);
     
+
     /* call strtok first time */
     token = strtok(reqinfo.requestmessage,search);
     strncpy(http_request_method,token,HTTP_METHOD_LENGTH);
@@ -104,7 +106,7 @@ void *get_request_obj(void *arg){
     syslog(LOG_NOTICE,"http_request_path : %s",request_path);
 
     http_request_method_type = solve_http_request_method(http_request_method);
-    solve_http_request(reqinfo.requestfd,http_request_method_type,request_path);
+    solve_http_request(reqinfo.requestfd,http_request_method_type,request_path,tmpmessage);
 
 
     pthread_exit(NULL);

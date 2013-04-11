@@ -19,7 +19,7 @@
 #endif
 
 
-extern void response(int,char *);
+extern void response(int,char *,char *);
 
 int solve_http_request_method(char *http_request_method){
     
@@ -31,11 +31,11 @@ int solve_http_request_method(char *http_request_method){
 
 }
 
-void solve_http_request(int requestfd,int flag_method,char *http_request_path){
+void solve_http_request(int requestfd,int flag_method,char *http_request_path,char *message){
     
     switch(flag_method){
         case FLAG_GET:
-            response(requestfd,http_request_path);
+            response(requestfd,http_request_path,message);
             break;
     }
     return ;

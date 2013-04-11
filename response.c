@@ -33,13 +33,14 @@
 
 void response4xx(int,int);
 void list_directory_content(int,char *);
-void responsereg(int,char *);
+void responsereg(int,char *,char *);
 void get_request_file_ext(char *,char*);
+void dynamic_cgi_php(int,char *);
 
 extern pthread_mutex_t sockfd_mutex_arr[SERV_MAX_DESCRIPTOR];
 extern int  writen(int,char *,int);
 
-void response(int reqhandfd,char *http_request_path){
+void response(int reqhandfd,char *http_request_path,char *http_request_message){
     
 
     DIR *dirp;
@@ -55,7 +56,7 @@ void response(int reqhandfd,char *http_request_path){
         }
     }else{
         if(S_ISREG(reqstat.st_mode)){
-            responsereg(reqhandfd,http_request_path);               
+            responsereg(reqhandfd,http_request_path,http_request_message);               
         }else if(S_ISDIR(reqstat.st_mode)){
             if((dirp = opendir(http_request_path)) == NULL){
                 if(errno == EACCES){
@@ -199,7 +200,6 @@ void response4xx(int reqhandfd,int flag){
 
     lstat(path4xx,&buf);
     filelength = buf.st_size;
-    syslog(LOG_NOTICE,"%d",filelength);
     sprintf(conlen,"Content-Length: %d\r\n\r\n",filelength);
     strncat(message,conlen,HTTP_MESSAGE_LENGTH-strlen(message)-1);
     writen(reqhandfd,message,strlen(message));
@@ -209,7 +209,6 @@ void response4xx(int reqhandfd,int flag){
             if(errno == EINTR)
                 continue;
             else{
-                syslog(LOG_ERR,"%s",strerror(errno));
                 break;
             }
         }
@@ -219,7 +218,7 @@ void response4xx(int reqhandfd,int flag){
     
 }
 
-void responsereg(int reqhandfd,char *http_request_path){
+void responsereg(int reqhandfd,char *http_request_path,char *http_request_message){
     
     FILE *fp;
     int typeflag;
@@ -251,8 +250,6 @@ void responsereg(int reqhandfd,char *http_request_path){
 
     ptr = http_request_path + strlen(ROOT_PATH);
     get_request_file_ext(ptr,ext);
-    syslog(LOG_NOTICE,"%s",ext);
-    syslog(LOG_NOTICE,"%s",http_request_path);
 
     if(lstat(http_request_path,&buf) == -1){
         if(errno == EACCES){
@@ -272,9 +269,13 @@ void responsereg(int reqhandfd,char *http_request_path){
                 response4xx(reqhandfd,404);
             }
         }else{
+
             strncpy(message,HEADER200,HTTP_MESSAGE_LENGTH);
             if(strcmp(ext,"html") == 0 || strcmp(ext,"htm") == 0){
                 strncat(message,CONTYPEHTML,HTTP_MESSAGE_LENGTH-strlen(message)-1);
+            }else if(strcmp(ext,"php") == 0){
+                dynamic_cgi_php(reqhandfd,http_request_message);
+                return ;
             }else if(strcmp(ext,"text") == 0 || strcmp(ext,"c") == 0 || strcmp(ext,"c++")==0 \
                     || strcmp(ext,"pl")==0 || strcmp(ext,"cc") == 0 || strcmp(ext,"h") == 0){
                 strncat(message,CONTYPEPLAIN,HTTP_MESSAGE_LENGTH-strlen(message)-1);
@@ -304,7 +305,6 @@ void responsereg(int reqhandfd,char *http_request_path){
 
         strncat(message,"\r\n\r\n",HTTP_MESSAGE_LENGTH-strlen(message)-1);
     
-        syslog(LOG_NOTICE,"%s",message);
         writen(reqhandfd,message,strlen(message));
         
         if(typeflag == 1){
@@ -321,11 +321,9 @@ void responsereg(int reqhandfd,char *http_request_path){
         while((nread = fread(content,sizeof(char),HTTP_MESSAGE_LENGTH,fp)) ){
             if(nread < 0){
                 if(errno == EINTR){
-                    syslog(LOG_ERR,"%s",strerror(errno));
                     continue;
                 }
                 else{
-                    syslog(LOG_ERR,"%s",strerror(errno));
                     break;
                 }
 
